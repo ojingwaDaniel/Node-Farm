@@ -3,24 +3,8 @@ const { readFileSync } = require("fs");
 const http = require("http");
 const path = require("path");
 const url = require("url");
-
-const replaceTemp = (temp, productData) => {
-    let output = temp.replace(/{%id%}/g, productData.id);
-    output = output.replace(/{%product-name%}/g, productData.productName);
-    output = output.replace(/{%image%}/g, productData.image);
-    output = output.replace(/{%from%}/g, productData.from);
-    output = output.replace(/{%nutrients%}/g, productData.nutrients);
-    output = output.replace(/{%quantity%}/g, productData.quantity);
-    output = output.replace(/{%price%}/g, productData.price);
-    output = output.replace(/{%description%}/g, productData.description);
-    if (!productData.organic) {
-        output = output.replace(/{%notOrganic%}/g, "not-organic");
-    } else {
-        output = output.replace(/{%notOrganic%}/g, "");
-    }
-    return output;
-
-}
+const slugify = require("slugify")
+const replaceTemp = require("./modules/replaceTemplates")
 
 const filePath = path.join(__dirname, "dev-data", "data.json")
 const data = readFileSync(filePath, "utf-8")
@@ -29,6 +13,11 @@ const tempOverview = readFileSync(path.join(__dirname, "templates", "overview.ht
 const tempProduct = readFileSync(path.join(__dirname, "templates", "product.html"), "utf-8")
 const tempCard = readFileSync(path.join(__dirname, "templates", "card.html"), "utf-8")
 
+const latestDataObject = dataObject.map(el => ({
+    ...el,
+    "slug": slugify(el.productName, { lower: true ,replacement:"_"})
+}))
+
 const server = http.createServer((req, res) => {
 
     const { query, pathname } = url.parse(req.url, true)
@@ -36,7 +25,7 @@ const server = http.createServer((req, res) => {
 
     if (pathname === "/" || pathname === "/overview") {
 
-        const cardHtmls = dataObject.map(el => replaceTemp(tempCard, el)).join("")
+        const cardHtmls = latestDataObject.map(el => replaceTemp(tempCard, el)).join("")
         const output = tempOverview.replace(/{%product-card%}/, cardHtmls)
         res.writeHead(200, { 'content-type': 'text/html' })
         res.end(output)
@@ -44,7 +33,7 @@ const server = http.createServer((req, res) => {
     }
     else if (pathname === "/product") {
 
-        const product = dataObject.find(el => el.id === Number(query.id))
+        const product = latestDataObject.find(el => el.slug === query.id)
         if (!product) {
             res.writeHead(404, {
                 "content-type": "text/html",
